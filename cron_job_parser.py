@@ -23,6 +23,9 @@ class CronJobParser:
         }
     
     def validate_range(self, val, idx):
+        """
+        Checks if the range is valid for each period.
+        """
         valid_range = self.ranges[idx]
         min_range = valid_range[0]
         max_range = valid_range[1]
@@ -32,12 +35,13 @@ class CronJobParser:
         return val
 
     def get_range(self, idx, expr):
+        """
+        Business logic to parse each expression and returns the range of values.
+        Incase the expression is invalid an exception is thrown
+        """
         step = 1
         value = []
-        if len(expr) == 1 and expr != '*':
-            if not expr.isnumeric():  # Example 'a'
-                raise InvalidCronCmd(f"Invalid expr: {expr}")
-            value = [int(expr)]
+        
         if '/' in expr:
             r = expr.split('/')
             if not r[1].isnumeric():  # Example: */a 
@@ -46,23 +50,32 @@ class CronJobParser:
                 raise InvalidCronCmd(f"{expr} is not standard")
             step = int(r[1])
             expr = r[0]
+        
         if ',' in expr:
             value = [int(i) for i in expr.split(',')]
+        
         if '-' in expr:
             r = expr.split('-')
-            if not r[0].isdigit() or not r[1].isdigit():
+            if not r[0].isdigit() or not r[1].isdigit():  # a-1 or 1-b
                 raise InvalidCronCmd(f"Value is not numeric: {expr}")
             min_range = int(r[0])
             max_range = int(r[1])
             if max_range < min_range:
                 raise InvalidCronCmd(f"Value is not numeric: {expr}")
-            
             value = [i for i in range(min_range, max_range+1)]
+        
         if '*' in expr:
             valid_range = self.ranges[idx]
             value = [i for i in range(valid_range[0], valid_range[1]+1)]
         
+        if not any([x in expr for x in [',', '-', '/', '*']]):  # Example 23
+            if expr.isnumeric():
+                value = [int(expr)]
+            else:  # example: a
+                raise InvalidCronCmd(f"Not a numeric: {expr}")
+
         if step > 1:
+            """ This will be hit by expr that have '/' """
             _min = value[0]
             _max = value[-1]
             new_range = [i for i in range(_min, _max+1, step)]
@@ -72,25 +85,28 @@ class CronJobParser:
 
     def parse(self, cmd):
         result = {}
-        cmd_list = cmd.split(" ")
+        cmd_list = cmd.split(" ")  
         if len(cmd_list) != 6:
             raise InvalidCronCmd(f"Invalid command args: {cmd}") 
         try:
             for idx, expr in enumerate(cmd_list):
-                if idx != 5:
+                if idx != 5:  # We only need to parse the expressions and not the command
                     period_range = self.get_range(idx, expr)
                     vals = " ".join(str(i) for i in period_range)
                     result[self.period[idx]] = vals
                 else:
                     result[self.period[idx]] = expr
         except Exception:
-            raise Exception
+            raise InvalidCronCmd("Invalid command")
         return result
     
     def pretty_print(self, cmd):
+        """
+        Pretty prints the parsed cron expression
+        """
         result = self.parse(cmd)
         try:
             for k, v in result.items():
-                print(f"{k}: {v}")
+                print(f"{k:14}: {v}")
         except InvalidCronCmd as e:
             print(f"Invalid input: {e}")

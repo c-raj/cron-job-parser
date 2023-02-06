@@ -28,3 +28,7 @@ $ pip install --upgrade pip
 $ python main.py "*/15 0 1,15 * 1-5 /usr/bin/find"
 ```
 NOTE: The cron expression must be inside quotes ("")
+6. To run the test
+```
+$ pytest
+```
